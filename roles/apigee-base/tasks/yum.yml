@@ -1,0 +1,5 @@
+---
+- name: Install Yum utilities
+  yum:
+    name: '{{ apigee_yum_utils }}'
+    state: present

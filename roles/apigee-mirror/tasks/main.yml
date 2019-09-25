@@ -1,0 +1,80 @@
+---
+- block:
+
+  - name: Install apigee-mirror
+    command: /opt/apigee/apigee-service/bin/apigee-service apigee-mirror install
+
+  - name: Update apigee-mirror
+    command: /opt/apigee/apigee-service/bin/apigee-service apigee-mirror update
+
+  - name: Configure Nginx
+    command: /opt/apigee/apigee-service/bin/apigee-service apigee-mirror nginxconfig
+
+  - name: Set Nginx port
+    replace:
+      dest: /opt/nginx/conf.d/apigee-mirror.conf
+      regexp: ^.*listen.*$
+      replace: '  listen   {{ apigee_mirror_port }};'
+
+  - name: Remove Nginx authentication
+    lineinfile:
+      dest: /opt/nginx/conf.d/apigee-mirror.conf
+      regexp: ^.*auth_.*$
+      state: absent
+    when: apigee_mirror_username is none
+
+
+  - block:
+
+    # Create file to ensure correct ownership and permissions.
+    - name: Regenerate htpasswd file
+      file:
+        path: /opt/apigee/data/apigee-mirror/.htpasswd
+        state: '{{ item }}'
+        owner: apigee
+        group: apigee
+        mode: 0600
+      with_items:
+        - absent
+        - touch
+
+    - name: Set Nginx credentials
+      command: /usr/bin/htpasswd -b /opt/apigee/data/apigee-mirror/.htpasswd {{ apigee_mirror_username }} {{ apigee_mirror_password }}
+
+    when: apigee_mirror_username is not none
+
+
+  #- name: Check for systemd
+  #  stat:
+  #    path: /etc/systemd
+  #  register: systemd
+
+  #- name: Configure systemd
+  #  include_tasks: systemd.yml
+  #  when: systemd.exists
+
+  # The apigee-nginx package includes /etc/rc.d/init.d/apigee-nginx, which works
+  # under both sysvinit and systemd.
+  - name: Enable and start Nginx
+    service:
+      name: apigee-nginx
+      enabled: true
+      state: restarted
+
+  - name: Synchronize mirror with current release
+    shell: apigeereleasever={{ apigee_release }} /opt/apigee/apigee-service/bin/apigee-service apigee-mirror sync
+    when:
+      - apigee_sync_mirror
+      - not apigee_sync_all_releases
+    failed_when: false
+
+  - name: Synchronize mirror with all releases
+    shell: apigeereleasever={{ item }} /opt/apigee/apigee-service/bin/apigee-service apigee-mirror sync
+    with_items: '{{ apigee_releases }}'
+    when:
+      - apigee_sync_mirror
+      - apigee_sync_all_releases
+    failed_when: false
+
+  become: true
+  become_user: root

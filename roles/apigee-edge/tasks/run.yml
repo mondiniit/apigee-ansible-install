@@ -1,0 +1,35 @@
+---
+- block:
+
+  #- import_tasks: scan.yml
+  #  when: apigee_scan_ports
+  #  tags:
+  #    - scan
+
+  - import_role:
+      name: apigee-tmp-dir
+    tags:
+      - response
+      - license
+
+  - import_tasks: response.yml
+    tags:
+     - response
+
+  - import_tasks: license.yml
+    tags:
+      - license
+
+  - import_tasks: setup.yml
+    tags:
+      - setup
+
+  - import_role:
+      name: apigee-tmp-dir
+      tasks_from: clean-up.yml
+    tags:
+      - response
+      - license
+
+  become: true
+  become_user: root

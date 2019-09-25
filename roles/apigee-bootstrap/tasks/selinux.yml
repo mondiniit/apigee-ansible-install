@@ -1,0 +1,11 @@
+---
+- name: Install SELinux support
+  yum:
+    name:
+      - libselinux-python
+      - selinux-policy
+    state: present
+
+- name: Disable SELinux
+  selinux:
+    state: disabled

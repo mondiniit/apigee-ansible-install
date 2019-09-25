@@ -1,0 +1,32 @@
+---
+- name: Set setup.sh path
+  set_fact:
+    apigee_setup_path: /opt/apigee/apigee-setup/bin/setup.sh
+
+- import_tasks: setup-pdb.yml
+  when: ('pdb' in apigee.profiles)
+
+- import_tasks: installation-path.yml
+  when: ('dp' in apigee.profiles)
+
+- name: Install sendmail
+  package:
+    name: sendmail
+    state: present
+  when: ('dp' in apigee.profiles)
+
+- name: Setup developer portal servers
+  shell: '{{ apigee_setup_path }} -f {{ apigee_dp_response_path }} -p dp'
+  when: ('dp' in apigee.profiles)
+
+# Developer Portal autostart script doesn't work
+- name: Check for Developer Portal
+  stat:
+    path: /opt/apigee/apigee-drupal-devportal
+  register: apigee_drupal_path
+
+- name: Enable automatic start
+  command: /opt/apigee/apigee-service/bin/apigee-all enable_autostart
+  when: apigee_enable_autostart
+  register: apigee_autostart_result
+  failed_when: apigee_autostart_result.rc != 0 and not apigee_drupal_path.stat.exists

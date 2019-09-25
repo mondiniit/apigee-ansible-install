@@ -1,0 +1,64 @@
+---
+- block:
+
+  - import_role:
+      name: apigee-tmp-dir
+    tags:
+      - response
+
+  - block:
+
+    - name: Install apigee-provision
+      command: creates=/opt/apigee/apigee-provision /opt/apigee/apigee-service/bin/apigee-service apigee-provision install
+      tags:
+        - setup
+
+    - name: Set response file path
+      set_fact:
+        apigee_org_response_path: '{{ apigee_tmp_dir }}/response-org-{{ apigee_organization_name }}-{{ apigee_environment_name }}-{{ apigee_virtual_host_name }}.txt'
+      tags:
+        - response
+
+    - name: Generate response file
+      template:
+        src: response-org.txt.j2
+        dest: '{{ apigee_org_response_path }}'
+        owner: apigee
+        group: apigee
+        mode: 0600
+      register: response_file
+      tags:
+        - response
+
+    - name: Create organization
+      command: /opt/apigee/apigee-service/bin/apigee-service apigee-provision setup-org -f {{ apigee_org_response_path }}
+      tags:
+        - setup
+
+    when:
+      - apigee.profiles | intersect(('ms', 'sa', 'aio'))
+      - apigee.ms_pause == 0
+
+  - name: Configure analytics purge job
+    cron:
+      name: apigee-analytics-purge-{{ apigee_organization_name }}-{{ apigee_environment_name }}
+      job: /opt/apigee/apigee-service/bin/apigee-service apigee-postgresql pg-data-purge {{ apigee_organization_name }} {{ apigee_environment_name }} {{ apigee_analytics_retention_days }}
+      user: apigee
+      weekday: 0
+      hour: 0
+      minute: 0
+      state: present
+    when:
+      - apigee.profiles | intersect(('ps', 'sax'))
+      - apigee_analytics_retention_days
+    tags:
+      - cron
+
+  - import_role:
+      name: apigee-tmp-dir
+      tasks_from: clean-up.yml
+    tags:
+      - response
+
+  become: true
+  become_user: root

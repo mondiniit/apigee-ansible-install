@@ -1,0 +1,17 @@
+---
+- name: Create apigee group
+  group:
+    name: apigee
+    system: yes
+    state: present
+
+- name: Create apigee user
+  user:
+    system: yes
+    name: apigee
+    group: apigee
+    comment: '{{ apigee_account_comment }}'
+    home: '{{ apigee_account_home }}'
+    createhome: no
+    shell: '{{ apigee_account_shell }}'
+    state: present

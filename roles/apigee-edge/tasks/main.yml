@@ -1,0 +1,15 @@
+---
+- name: Set Apigee facts
+  apigee_facts:
+    hostvars: '{{ hostvars }}'
+    topology: '{{ apigee_topology }}'
+    my_hostname: '{{ apigee_cluster_hostname }}'
+  tags:
+    - facts
+    - scan
+    - response
+    - license
+    - setup
+
+- import_tasks: run.yml
+  when: apigee

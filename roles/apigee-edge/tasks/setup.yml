@@ -1,0 +1,56 @@
+---
+- name: Set setup.sh path
+  set_fact:
+    apigee_setup_path: /opt/apigee/apigee-setup/bin/setup.sh
+
+- import_tasks: setup-ds.yml
+  when: apigee.profiles | intersect(('ds', 'sa', 'aio'))
+
+- name: Setup LDAP servers
+  shell: '{{ apigee_setup_path }} -f {{ apigee_edge_response_path }} -p ld'
+  when: ('ld' in apigee.profiles)
+
+- name: Setup Management servers
+  shell: sleep {{ apigee.ms_pause }}; {{ apigee_setup_path }} -f {{ apigee_edge_response_path }} -p ms
+  when: ('ms' in apigee.profiles)
+
+# For clustered installations.
+- import_tasks: setup-ds-keyspace.yml
+  when: ('ds' in apigee.profiles)
+
+- name: Set Message Processor limits
+  copy:
+    src: 99-message-processor.conf
+    dest: /etc/security/limits.d/99-message-processor.conf
+    owner: root
+    group: root
+    mode: 0644
+  when:
+    - apigee_set_limits
+    - apigee.profiles | intersect(('mp', 'rmp', 'sa', 'aio'))
+
+- import_tasks: installation-path.yml
+  when: apigee.profiles | intersect(('r', 'rmp', 'sa', 'aio'))
+
+- name: Setup gateways and queues
+  command: '{{ apigee_setup_path }} -f {{ apigee_edge_response_path }} -p {{ item }}'
+  with_items: '{{ apigee.profiles }}'
+  when: item in ('r', 'mp', 'rmp', 'qs', 'sa', 'aio')
+
+# For standalone installations.
+- import_tasks: setup-ds-keyspace.yml
+  when: apigee.profiles | intersect(('sa', 'aio'))
+
+- import_tasks: setup-ps.yml
+
+# Developer Portal autostart script doesn't work
+- name: Check for Developer Portal
+  stat:
+    path: /opt/apigee/apigee-drupal-devportal
+  register: apigee_drupal_path
+
+- name: Enable automatic start
+  command: /opt/apigee/apigee-service/bin/apigee-all enable_autostart
+  when: apigee_enable_autostart
+  register: apigee_autostart_result
+  failed_when: apigee_autostart_result.rc != 0 and not apigee_drupal_path.stat.exists
